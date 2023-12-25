@@ -1,10 +1,9 @@
 import { Stack, StackProps, RemovalPolicy } from "aws-cdk-lib";
 import { Construct } from 'constructs';
-// import { Bucket,ObjectOwnership }from 'aws-cdk-lib/aws-s3';
-import * as s3 from 'aws-cdk-lib/aws-s3';
-
+import { Bucket,ObjectOwnership }from 'aws-cdk-lib/aws-s3';
 import { CfnTrail } from 'aws-cdk-lib/aws-cloudtrail';
 import { PolicyStatement, Effect, ServicePrincipal }from 'aws-cdk-lib/aws-iam';
+import { BackedDataSource } from "aws-cdk-lib/aws-appsync";
 
 
 interface CloudTrailS3DataEventStackProps extends StackProps {
@@ -18,8 +17,9 @@ export class CloudTrailS3DataEventStack extends Stack {
     super(scope, id, props);
     this.cloudtrailName = props.cloudtrailName
 
-    const bucket = new s3.Bucket(this, 'DataBucketTest', {
-      objectOwnership: s3.ObjectOwnership.BUCKET_OWNER_ENFORCED,
+    const bucket = new Bucket(this, 'DataBucketTest', {
+      objectOwnership: ObjectOwnership.BUCKET_OWNER_ENFORCED,
+
     });
     bucket.addToResourcePolicy(
       new PolicyStatement({
@@ -41,7 +41,7 @@ export class CloudTrailS3DataEventStack extends Stack {
         effect: Effect.ALLOW,
         principals: [new ServicePrincipal("cloudtrail.amazonaws.com")],
         actions: ["s3:PutObject"],
-        resources: [`${bucket.bucketArn}/AWSLogs/304179817986/*`],
+        resources: [`${bucket.bucketArn}/AWSLogs/${Stack.of(this).account}/*`],
         conditions: {
           StringEquals: {
             "s3:x-amz-acl": "bucket-owner-full-control",
@@ -51,10 +51,11 @@ export class CloudTrailS3DataEventStack extends Stack {
       }),
     );
 
-    new CfnTrail(this, `CloudTrail`, {
+    const trail = new CfnTrail(this, `CloudTrail`, {
       isLogging: true,
       trailName: this.cloudtrailName,
       s3BucketName: bucket.bucketName, 
     });
+    trail.node.addDependency(bucket)
   }
   };
